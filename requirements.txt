@@ -1,6 +1,6 @@
 streamlit
 opencv-python-headless
 numpy
-mediapipe
+mediapipe==0.10.9
 langchain-google-genai
 langchain-core
