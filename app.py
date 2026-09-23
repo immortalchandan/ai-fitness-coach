@@ -30,7 +30,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Legacy MediaPipe Pose Solution (Cloud-Friendly)
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
@@ -120,26 +119,27 @@ with tab1:
             last_rep_ms_l = -5000
             last_rep_ms_r = -5000
             
-            # Setup MediaPipe Pose Instance
             with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+                frame_count = 0
                 while cap.isOpened() and run_tracking:
                     loop_start = time.time()
                     
                     ret, frame = cap.read()
                     if not ret: 
-                        st.success("Video processing complete.")
                         break
                     
+                    frame_count += 1
                     h, w, _ = frame.shape
-                    max_height = 650
-                    max_width = 1000
+                    
+                    # OPTIMIZED: Clamped to 480p for lightning-fast WebSocket streaming
+                    max_height = 480
+                    max_width = 800
                     scale = min(max_height / h, max_width / w)
                     
                     if scale < 1.0: 
                         frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
                         h, w, _ = frame.shape 
                     
-                    # Recalculate timestamp simulation
                     timestamp_ms += int(frame_duration * 1000)
                     
                     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -163,7 +163,6 @@ with tab1:
                                 perc_l, perc_r = 0, 0
                                 fb_l, fb_r = "Perfect Form", "Perfect Form"
                                 
-                                # --- LEFT ARM PROCESSING ---
                                 if vis_l:
                                     s_l, e_l, w_l = get_px(11), get_px(13), get_px(15)
                                     angle_l = calculate_angle(s_l, e_l, w_l)
@@ -190,7 +189,6 @@ with tab1:
                                                     counter += 1
                                                 last_rep_ms_l = timestamp_ms
 
-                                # --- RIGHT ARM PROCESSING ---
                                 if vis_r:
                                     s_r, e_r, w_r = get_px(12), get_px(14), get_px(16)
                                     angle_r = calculate_angle(s_r, e_r, w_r)
@@ -226,7 +224,6 @@ with tab1:
                                     
                                 percentage = max(perc_l, perc_r)
 
-                            # --- FULL BODY TRACKING (Squat & Push-up) ---
                             elif exercise == "Squat":
                                 if lm[11].visibility > 0.6 and lm[23].visibility > 0.6 and lm[25].visibility > 0.6 and lm[27].visibility > 0.6:
                                     knee, ankle = get_px(25), get_px(27)
@@ -267,35 +264,32 @@ with tab1:
                         except Exception as e:
                             pass
                         
-                        # Draw standard skeleton mesh
                         mp_drawing.draw_landmarks(
                             frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS,
                             mp_drawing.DrawingSpec(color=(255, 0, 255), thickness=2, circle_radius=2),
                             mp_drawing.DrawingSpec(color=(255, 255, 0), thickness=2, circle_radius=2)
                         )
                         
-                        # Top Dashboard
                         draw_transparent_overlay(frame, 0, 0, w, 80)
-                        cv2.putText(frame, f"MODE: {exercise.upper()}", (20, 30), cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-                        cv2.putText(frame, "REPS", (20, 60), cv2.FONT_HERSHEY_DUPLEX, 0.7, (200, 200, 200), 1, cv2.LINE_AA)
-                        cv2.putText(frame, str(int(counter)), (90, 65), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 2, cv2.LINE_AA)
+                        cv2.putText(frame, f"MODE: {exercise.upper()}", (20, 30), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(frame, "REPS", (20, 55), cv2.FONT_HERSHEY_DUPLEX, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
+                        cv2.putText(frame, str(int(counter)), (80, 58), cv2.FONT_HERSHEY_DUPLEX, 1.2, (0, 255, 0), 2, cv2.LINE_AA)
                         
-                        # Bottom Dashboard
-                        draw_transparent_overlay(frame, 0, h-60, w, 60)
-                        cv2.putText(frame, f"STATUS: {feedback}", (20, h-20), cv2.FONT_HERSHEY_DUPLEX, 0.8, feedback_color, 2, cv2.LINE_AA)
+                        draw_transparent_overlay(frame, 0, h-45, w, 45)
+                        cv2.putText(frame, f"STATUS: {feedback}", (15, h-15), cv2.FONT_HERSHEY_DUPLEX, 0.6, feedback_color, 2, cv2.LINE_AA)
                         
                         bar_height = int(h * 0.4)               
                         y_top = (h - bar_height) // 2           
                         y_bottom = y_top + bar_height
-                        x_left = 20                             
-                        x_right = 45
+                        x_left = 15                             
+                        x_right = 35
                         
                         bar_val = int(np.interp(percentage, (0, 100), (y_bottom, y_top)))
                         
                         cv2.rectangle(frame, (x_left, y_top), (x_right, y_bottom), (50, 50, 50), -1) 
                         cv2.rectangle(frame, (x_left, bar_val), (x_right, y_bottom), (0, 255, 0) if feedback == "Perfect Form" else (0, 0, 255), -1)
                         cv2.rectangle(frame, (x_left, y_top), (x_right, y_bottom), (255, 255, 255), 2)
-                        cv2.putText(frame, f'{int(percentage)}%', (x_left - 5, y_top - 15), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(frame, f'{int(percentage)}%', (x_left - 5, y_top - 10), cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1, cv2.LINE_AA)
                         
                     frame_placeholder.image(frame, channels="BGR", use_container_width=False)
                     
