@@ -1,0 +1,6 @@
+streamlit
+opencv-python-headless
+numpy
+mediapipe
+langchain-google-genai
+langchain-core
